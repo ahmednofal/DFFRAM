@@ -28,6 +28,7 @@ import math
 from types import SimpleNamespace as NS
 from functools import partial
 from typing import Callable, List, Dict, Union, TextIO
+from collections.abc import Iterable
 
 # --
 
@@ -676,6 +677,8 @@ class Mux(Placeable):
 class HigherLevelPlaceable(LRPlaceable):
     def __init__(self, instances: List[Instance], block_size: int):
         self.clkbuf: Instance = None
+        self.diode_clkbuf: Instance = None
+        self.diode_clk: Instance = None
         self.dibufs: List[Instance] = None
         self.webufs: List[Instance] = None
 
@@ -697,7 +700,11 @@ class HigherLevelPlaceable(LRPlaceable):
         raw_decoder_ands: Dict[int, Dict[int, Instance]] = {}
         raw_enbufs: Dict[int, Instance] = {}
         raw_domuxes: Dict[int, List[Instance]] = {}
+        raw_diodes_muxes: Dict[int, Dict[int, Instance]] = {}
         raw_abufs: Dict[int, Dict[int, Instance]] = {}
+        raw_diodes_abufs: Dict[int, Dict[int, Instance]] = {}
+        raw_diodes_a: Dict[int, Dict[int, Instance]] = {}
+        raw_diodes_sels: Dict[int, Dict[int, Instance]] = {}
 
         m = NS()
         r = self.regexes()
@@ -721,11 +728,30 @@ class HigherLevelPlaceable(LRPlaceable):
                 raw_webufs[i] = instance
             elif sarv(m, "clkbuf_match", re.search(r.clkbuf, n)):
                 self.clkbuf = instance
+            elif sarv(m, "diode_clkbuf_match", re.search(r.diode_clkbuf, n)):
+                self.diode_clkbuf = instance
+            elif sarv(m, "diode_clkbuf_match", re.search(r.diode_clk, n)):
+                self.diode_clk = instance
             elif sarv(m, "abuf_match", re.search(r.abuf, n)):
                 port = int(m.abuf_match[1] or "0")
                 i = int(m.abuf_match[2])
                 raw_abufs[port] = raw_abufs.get(port) or {}
                 raw_abufs[port][i] = instance
+            elif sarv(m, "diode_abuf_match", re.search(r.diode_abuf, n)):
+                port = int(m.diode_abuf_match[1] or "0")
+                i = int(m.diode_abuf_match[2])
+                raw_diodes_abufs[port] = raw_diodes_abufs.get(port) or {}
+                raw_diodes_abufs[port][i] = instance
+            elif sarv(m, "diode_a_match", re.search(r.diode_a, n)):
+                port = int(m.diode_a_match[1] or "0")
+                i = int(m.diode_a_match[2])
+                raw_diodes_a[port] = raw_diodes_a.get(port) or {}
+                raw_diodes_a[port][i] = instance
+            elif sarv(m, "diode_sel_match", re.search(r.diode_sel, n)):
+                port = int(m.diode_sel_match[1] or "0")
+                i = int(m.diode_sel_match[2])
+                raw_diodes_sels[port] = raw_diodes_sels.get(port) or {}
+                raw_diodes_sels[port][i] = instance
             elif sarv(m, "enbuf_match", re.search(r.enbuf, n)):
                 port = int(m.enbuf_match[1] or "0")
                 raw_enbufs[port] = instance
@@ -733,6 +759,11 @@ class HigherLevelPlaceable(LRPlaceable):
                 port = int(m.domux_match[1] or "0")
                 raw_domuxes[port] = raw_domuxes.get(port) or []
                 raw_domuxes[port].append(instance)
+            elif sarv(m, "diode_mux_match", re.search(r.diode_mux, n)):
+                port = int(m.diode_mux_match[1] or "0")
+                i = int(m.diode_mux_match[2])
+                raw_diodes_muxes[port] = raw_diodes_muxes.get(port) or {}
+                raw_diodes_muxes[port][i] = instance
             else:
                 raise DataError("Unknown element in %s: %s" % (type(self).__name__, n))
 
@@ -746,6 +777,10 @@ class HigherLevelPlaceable(LRPlaceable):
         self.decoder_ands = d2a({k: d2a(v) for k, v in raw_decoder_ands.items()})
         self.enbufs = d2a(raw_enbufs)
         self.domuxes = d2a({ k: Mux(v) for k, v in raw_domuxes.items()})
+        self.diodes_abufs = d2a({k: d2a(v) for k, v in raw_diodes_abufs.items()})
+        self.diodes_a = d2a({k: d2a(v) for k, v in raw_diodes_a.items()})
+        self.diodes_sels = d2a({k: d2a(v) for k, v in raw_diodes_sels.items()})
+        self.diodes_muxes = d2a({k: d2a(v) for k, v in raw_diodes_muxes.items()})
         self.abufs = d2a({k: d2a(v) for k, v in raw_abufs.items()})
 
     def represent(self, tab_level: int = -1, file: TextIO = sys.stderr):
@@ -770,7 +805,19 @@ class HigherLevelPlaceable(LRPlaceable):
         def symmetrically_placeable():
             return self.word_count() > 128
 
-        current_row = start_row
+        # ele_list: a flat list of elements
+        def simple_place_vertically(start_row:int, ele_list:List):
+            print(len(ele_list))
+            print(ele_list)
+            def flatten(l):
+                return [item for sublist in l for item in sublist]
+
+            ele_list = flatten(ele_list)
+            for i in range(len(ele_list)):
+                r = row_list[start_row + i]
+                r.place(ele_list[i])
+            return start_row + len(ele_list) # return the highest row we have reached
+
 
         def place_horizontal_elements(start_row: int):
             # all of the big designs include 4 instances
@@ -797,17 +844,26 @@ class HigherLevelPlaceable(LRPlaceable):
 
             current_row += 1
 
-            for domux in self.domuxes:
-                current_row = domux.place(row_list, current_row)
+            for idx in range(len(self.diodes_muxes)):
+                for sidx in range(len(self.diodes_muxes[idx])):
+                    row_list[current_row].place(self.diodes_muxes[idx][sidx])
+                current_row += 1
+                current_row = self.domuxes[idx].place(row_list, current_row)
 
             return current_row
 
+        current_row = start_row
+        simple_place_vertically(0, self.diodes_sels)
+        simple_place_vertically(0, self.diodes_abufs)
+        simple_place_vertically(0, self.diodes_a)
         return self.lrplace(
             row_list=row_list,
             start_row=current_row,
             addresses=len(self.domuxes),
             common=[
                 *([self.clkbuf] if self.clkbuf is not None else []),
+                *([self.diode_clkbuf] if self.diode_clkbuf is not None else []),
+                *([self.diode_clk] if self.diode_clk is not None else []),
                 *self.webufs
             ],
             port_elements=[
