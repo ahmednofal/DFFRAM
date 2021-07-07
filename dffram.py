@@ -110,6 +110,10 @@ def merge_lefs_into(build_folder, merged_filename="sky130_fd_sc_hd.merged.lef"):
     with open(os.path.join(build_folder, merged_filename), 'w') as merged_lef:
         merged_lef.write(''.join(merged_lef_lines))
 
+    merged_filename = 'merged.lef'
+    with open(os.path.join(build_folder, merged_filename), 'w') as merged_lef:
+        merged_lef.write(''.join(merged_lef_lines))
+
 def prep(build_folder, local_pdk_root):
     global pdk_root, pdk_tech_dir, pdk_ref_dir, pdk_liberty_dir
     global pdk_lef_dir, pdk_tlef_dir
