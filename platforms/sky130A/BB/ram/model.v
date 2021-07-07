@@ -77,8 +77,6 @@ module MUX4x1 #(parameter   WIDTH=32)
     generate
         genvar i;
         for(i=0; i<SIZE; i=i+1) begin : M
-            (* keep = "true" *)
-            sky130_fd_sc_hd__diode_2 DIODE_X [7:0] (.DIODE(X[(i+1)*8-1:i*8]));
             sky130_fd_sc_hd__mux4_1 MUX[7:0] (
                     .A0(A0[(i+1)*8-1:i*8]), 
                     .A1(A1[(i+1)*8-1:i*8]), 
@@ -494,8 +492,8 @@ module RAM128 #(parameter   USE_LATCH=1,
     /* sky130_fd_sc_hd__diode_2 DIODE_CLK (.DIODE(CLK)); */
     /* (* keep = "true" *) */
     /* sky130_fd_sc_hd__diode_2 DIODE_CLKBUF (.DIODE(CLK_buf)); */
-    /* (* keep = "true" *) */
-    /* sky130_fd_sc_hd__diode_2 DIODE_A0 [6:0] (.DIODE(A0[6:0])); */
+    (* keep = "true" *)
+    sky130_fd_sc_hd__diode_2 DIODE_A0 [6:0] (.DIODE(A0[6:0]));
     /* (* keep = "true" *) */
     /* sky130_fd_sc_hd__diode_2 DIODE_A1 [6:0] (.DIODE(A0[6:0])); */
     (* keep = "true" *)
@@ -511,8 +509,8 @@ module RAM128 #(parameter   USE_LATCH=1,
      endgenerate
 
     // Output MUX    
-    /* (* keep = "true" *) */
-    /* sky130_fd_sc_hd__diode_2 DIODE_Do0_MUX [((WSIZE*8)*4/4)-1:0] (.DIODE(Do0[((WSIZE*8)*4/4)-1:0])); */
+    (* keep = "true" *)
+    sky130_fd_sc_hd__diode_2 DIODE_Do0_MUX [((WSIZE*8)*4/4)-1:0] (.DIODE(Do0[((WSIZE*8)*4/4)-1:0]));
     MUX4x1 #(.WIDTH(WSIZE*8)) DoMUX ( .A0(Do0_pre[0]), .A1(Do0_pre[1]), .A2(Do0_pre[2]), .A3(Do0_pre[3]), .S(A0_buf[6:5]), .X(Do0) );
 
 endmodule
@@ -581,10 +579,10 @@ module RAM128_1RW1R #( parameter    USE_LATCH=1,
      endgenerate
 
     // Output MUXs    
-    /* (* keep = "true" *) */
-    /* sky130_fd_sc_hd__diode_2 DIODE_Do0_MUX [((WSIZE*8)*2)-1:0] (.DIODE({Do0[1], Do0[0]})); */
-    /* (* keep = "true" *) */
-    /* sky130_fd_sc_hd__diode_2 DIODE_Do1_MUX [((WSIZE*8)*2)-1:0] (.DIODE({Do1[1], Do1[0]})); */
+    (* keep = "true" *)
+    sky130_fd_sc_hd__diode_2 DIODE_Do0_MUX [((WSIZE*8)*2)-1:0] (.DIODE({Do0[1], Do0[0]}));
+    (* keep = "true" *)
+    sky130_fd_sc_hd__diode_2 DIODE_Do1_MUX [((WSIZE*8)*2)-1:0] (.DIODE({Do1[1], Do1[0]}));
     /* (* keep = "true" *) */
     /* sky130_fd_sc_hd__diode_2 DIODE_Do1_MUX [((WSIZE*8)*3)-1:0] (.DIODE({Do1[0], Do1_pre[1],Do1_pre[0]})); */
     MUX4x1 #(.WIDTH(WSIZE*8)) Do0MUX ( .A0(Do0_pre[0]), .A1(Do0_pre[1]), .A2(Do0_pre[2]), .A3(Do0_pre[3]), .S(A0_buf[6:5]), .X(Do0) );

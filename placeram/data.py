@@ -25,7 +25,6 @@ from opendbpy import dbInst as Instance
 import re
 import sys
 import math
-import time
 from types import SimpleNamespace as NS
 from functools import partial
 from typing import Callable, List, Dict, Union, TextIO
@@ -636,11 +635,9 @@ class Mux(Placeable):
         # First access is the byte
         self.selbufs: List[List[Instance]] = None
         self.muxes: List[List[Instance]] = None
-        self.diodes: List[List[Instance]] = None
 
         raw_selbufs: Dict[int, Dict[int, Instance]] = {}
         raw_muxes: Dict[int, Dict[int, Instance]] = {}
-        raw_diodes: Dict[int, Dict[int, Instance]] = {}
 
         m = NS()
         r = self.regexes()
@@ -650,13 +647,7 @@ class Mux(Placeable):
                 line, byte = (int(m.selbuf_match[1] or "0"), int(m.selbuf_match[2]))
                 raw_selbufs[byte] = raw_selbufs.get(byte) or {}
                 raw_selbufs[byte][line] = instance
-            elif sarv(m, "diode_match", re.search(r.diode, n)):
-                print(n)
-                byte, bit = (int(m.diode_match[1]), int(m.diode_match[2]))
-                raw_diodes[byte] = raw_diodes.get(byte) or {}
-                raw_diodes[byte][bit] = instance
             elif sarv(m, "mux_match", re.search(r.mux, n)):
-                print(n)
                 byte, bit = (int(m.mux_match[1]), int(m.mux_match[2]))
                 raw_muxes[byte] = raw_muxes.get(byte) or {}
                 raw_muxes[byte][bit] = instance
@@ -665,7 +656,6 @@ class Mux(Placeable):
 
         self.selbufs = d2a({k: d2a(v) for k, v in raw_selbufs.items()})
         self.muxes = d2a({k: d2a(v) for k, v in raw_muxes.items()})
-        self.diodes = d2a({k: d2a(v) for k, v in raw_diodes.items()})
 
     def represent(self, tab_level: int = -1, file: TextIO = sys.stderr):
         tab_level += 1
@@ -673,14 +663,12 @@ class Mux(Placeable):
         P.ra("Selection Buffers", self.selbufs, tab_level, file, header="Byte")
         P.ra("Logic Elements", self.muxes, tab_level, file, header="Byte")
 
-    def place(self, row_list: List[Row], start_row: int = 0, aux_instances: List[Instance] = []):
+    def place(self, row_list: List[Row], start_row: int = 0):
         r = row_list[start_row]
 
-        for selbuf_lines, mux_bits, mux_diodes in zip(self.selbufs, self.muxes, self.diodes):
+        for selbuf_lines, mux_bits in zip(self.selbufs, self.muxes):
             for line in selbuf_lines:
                 r.place(line)
-            for mux_diode in mux_diodes:
-                r.place(mux_diode)
             for bit in mux_bits:
                 r.place(bit)
 
@@ -772,6 +760,11 @@ class HigherLevelPlaceable(LRPlaceable):
                 port = int(m.domux_match[1] or "0")
                 raw_domuxes[port] = raw_domuxes.get(port) or []
                 raw_domuxes[port].append(instance)
+            elif sarv(m, "diode_mux_match", re.search(r.diode_mux, n)):
+                port = int(m.diode_mux_match[1] or "0")
+                i = int(m.diode_mux_match[2])
+                raw_diodes_muxes[port] = raw_diodes_muxes.get(port) or {}
+                raw_diodes_muxes[port][i] = instance
             else:
                 raise DataError("Unknown element in %s: %s" % (type(self).__name__, n))
 
@@ -815,6 +808,8 @@ class HigherLevelPlaceable(LRPlaceable):
 
         # ele_list: a flat list of elements
         def simple_place_vertically(start_row:int, ele_list:List):
+            print(len(ele_list))
+            print(ele_list)
             def flatten(l):
                 return [item for sublist in l for item in sublist]
 
@@ -850,16 +845,16 @@ class HigherLevelPlaceable(LRPlaceable):
 
             current_row += 1
 
-            for adomux in self.domuxes:
-                current_row = adomux.place(row_list, current_row)
+            for idx in range(len(self.diodes_muxes)):
+                for sidx in range(len(self.diodes_muxes[idx])):
+                    row_list[current_row].place(self.diodes_muxes[idx][sidx])
+                current_row = self.domuxes[idx].place(row_list, current_row)
 
             return current_row
 
         current_row = start_row
         simple_place_vertically(0, self.diodes_sels)
-        simple_place_vertically(0, self.diodes_abufs)
-        simple_place_vertically(0, self.diodes_a)
-        return self.lrplace(
+        return_row = self.lrplace(
             row_list=row_list,
             start_row=current_row,
             addresses=len(self.domuxes),
@@ -876,6 +871,9 @@ class HigherLevelPlaceable(LRPlaceable):
             ],
             place_horizontal_elements=place_horizontal_elements
         )
+        simple_place_vertically(0, self.diodes_abufs)
+        simple_place_vertically(0, self.diodes_a)
+        return return_row
 
     def word_count(self):
         return len(self.blocks) * (self.blocks[0].word_count())

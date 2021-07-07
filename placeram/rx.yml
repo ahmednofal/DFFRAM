@@ -39,7 +39,6 @@ Block:
 Mux:
   selbuf: "\\bSEL(\\d*)?BUF\\\\\\[(\\d+)\\\\\\]"
   mux: "\\bM\\\\\\[(\\d+)\\\\\\]\\.MUX\\\\\\[(\\d+)\\\\\\]"
-  diode: "\\bM\\\\\\[(\\d+)\\\\\\]\\.DIODE_X\\\\\\[(\\d+)\\\\\\]"
 HigherLevelPlaceable:
   "32": "\\bBLOCK\\\\\\[(\\d+)\\\\\\]"
   "128": "\\bBANK128\\\\\\[(\\d+)\\\\\\]"
@@ -50,6 +49,7 @@ HigherLevelPlaceable:
   enbuf: "\\bEN(\\d*)BUF\\b"
   decoder_and: "\\bDEC(\\d*)\\.AND(\\d+)\\b"
   dibuf: "\\bDIBUF\\\\\\[(\\d+)\\\\\\]"
+  diode_mux: "\\bDIODE_Do(\\d*)_MUX\\\\\\[(\\d+)\\\\\\]"
   domux: "\\bDo(\\d*)MUX\\b"
   webuf: "\\bWEBUF\\\\\\[(\\d+)\\\\\\]"
   abuf: "\\bA(\\d*)BUF\\\\\\[(\\d+)\\\\\\]"
