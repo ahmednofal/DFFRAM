@@ -179,6 +179,7 @@ class Word(Placeable):
         P.ra("Bytes", self.bytes, tab_level, file, header="Byte")
 
     def place(self, row_list: List[Row], start_row: int = 0):
+        print(start_row)
         r = row_list[start_row]
 
         for byte in self.bytes:
@@ -663,14 +664,18 @@ class Mux(Placeable):
         P.ra("Selection Buffers", self.selbufs, tab_level, file, header="Byte")
         P.ra("Logic Elements", self.muxes, tab_level, file, header="Byte")
 
-    def place(self, row_list: List[Row], start_row: int = 0):
+    def place(self, row_list: List[Row], start_row: int = 0, aux_instances = None):
         r = row_list[start_row]
 
         for selbuf_lines, mux_bits in zip(self.selbufs, self.muxes):
             for line in selbuf_lines:
+                print("placing line")
                 r.place(line)
-            for bit in mux_bits:
-                r.place(bit)
+            for idx in range(len(mux_bits)):
+            # for bit in mux_bits:
+                print("placing mux bit")
+                r.place(aux_instances[idx])
+                r.place(mux_bits[idx])
 
         return start_row + 1
 
@@ -763,8 +768,8 @@ class HigherLevelPlaceable(LRPlaceable):
             elif sarv(m, "diode_mux_match", re.search(r.diode_mux, n)):
                 port = int(m.diode_mux_match[1] or "0")
                 i = int(m.diode_mux_match[2])
-                raw_diodes_muxes[port] = raw_diodes_muxes.get(port) or {}
-                raw_diodes_muxes[port][i] = instance
+                raw_diodes_muxes[port] = raw_diodes_muxes.get(port) or []
+                raw_diodes_muxes[port].append(instance)
             else:
                 raise DataError("Unknown element in %s: %s" % (type(self).__name__, n))
 
@@ -845,16 +850,19 @@ class HigherLevelPlaceable(LRPlaceable):
 
             current_row += 1
 
-            for idx in range(len(self.diodes_muxes)):
-                for sidx in range(len(self.diodes_muxes[idx])):
-                    row_list[current_row].place(self.diodes_muxes[idx][sidx])
-                current_row = self.domuxes[idx].place(row_list, current_row)
+            print("diodes_muxes lenght", len(self.diodes_muxes))
+            print("domuxes lenght", len(self.domuxes))
+            for idx in range(len(self.domuxes)):
+                # for sidx in range(len(self.diodes_muxes[idx])):
+                    # row_list[current_row].place(self.diodes_muxes[idx][sidx])
+                print("diodes_muxes[%i] length is %i " % (idx, len(self.diodes_muxes[idx])))
+                print("domuxes[%i] length is %i " % (idx, len(self.domuxes[idx])))
+                current_row = self.domuxes[idx].place(row_list, current_row, self.diodes_muxes[idx])
 
             return current_row
 
         current_row = start_row
-        simple_place_vertically(0, self.diodes_sels)
-        return_row = self.lrplace(
+        row_to_return = self.lrplace(
             row_list=row_list,
             start_row=current_row,
             addresses=len(self.domuxes),
@@ -871,9 +879,10 @@ class HigherLevelPlaceable(LRPlaceable):
             ],
             place_horizontal_elements=place_horizontal_elements
         )
+        simple_place_vertically(0, self.diodes_sels)
         simple_place_vertically(0, self.diodes_abufs)
         simple_place_vertically(0, self.diodes_a)
-        return return_row
+        return row_to_return
 
     def word_count(self):
         return len(self.blocks) * (self.blocks[0].word_count())

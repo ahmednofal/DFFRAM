@@ -365,8 +365,8 @@ module RAM32 #( parameter   USE_LATCH=1,
     endgenerate
     
     (* keep = "true" *)
-    sky130_fd_sc_hd__diode_2 DIODE_Do0_FF [WSIZE*8-1:0] (.DIODE(Do0));
-    sky130_fd_sc_hd__diode_2 DIODE_Do1_FF [WSIZE*8-1:0] (.DIODE(Do0));
+    sky130_fd_sc_hd__diode_2 DIODE_Do0_FF [WSIZE*8-1:0] (.DIODE(Do0[WSIZE*8-1:0]));
+    sky130_fd_sc_hd__diode_2 DIODE_Do1_FF [WSIZE*8-1:0] (.DIODE(Do0[WSIZE*8-1:0]));
     sky130_fd_sc_hd__dfxtp_1 Do_FF [WSIZE*8-1:0] ( .D(Do0_pre), .Q(Do0), .CLK(CLK) );
 
 endmodule
